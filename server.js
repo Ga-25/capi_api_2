@@ -381,5 +381,5 @@ app.listen(PORT, () => {
   console.log(`📋 API Version: ${API_VERSION}`);
   console.log(`🧪 Test Mode: ${TEST_EVENT_CODE ? 'ATIVO' : 'DESATIVADO'}`);
   console.log(`⚡ Endpoints: /event, /purchase, /health`);
-  console.log(`🌐 Acesse: https://seu-app.onrender.com`);
+  console.log(`🌐 Acesse: https://capi-api-2.onrender.com`);
 });
