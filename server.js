@@ -107,7 +107,38 @@ app.post("/event", async (req, res) => {
 
 
     // ENHANCED CUSTOM_DATA
+    // ✅ ENHANCED CUSTOM_DATA COM PREDICTED_LTV
     const enhanced_custom_data = { ...custom_data };
+
+
+
+    // Garantir que value seja numérico se existir
+    if (enhanced_custom_data.value) {
+        enhanced_custom_data.value = parseFloat(enhanced_custom_data.value);
+    }
+
+
+
+    // Garantir currency padrão
+    if (!enhanced_custom_data.currency && enhanced_custom_data.value) {
+        enhanced_custom_data.currency = "BRL";
+    }
+
+
+
+    // ✅ ADICIONAR PREDICTED_LTV PARA REGISTRATION
+    if (event_name === "CompleteRegistration" && enhanced_custom_data.value) {
+        if (!enhanced_custom_data.predicted_ltv) {
+            enhanced_custom_data.predicted_ltv = Math.round(enhanced_custom_data.value * 8.5);
+        }
+        // Garantir estrutura completa para Registration
+        if (!enhanced_custom_data.content_type) {
+            enhanced_custom_data.content_type = "product";
+        }
+        if (!enhanced_custom_data.delivery_category) {
+            enhanced_custom_data.delivery_category = "digital_product";
+        }
+    }
     
     // Garantir que value seja numérico se existir
     if (enhanced_custom_data.value) {
@@ -146,6 +177,7 @@ app.post("/event", async (req, res) => {
     console.log(`📡 Enviando evento: ${event_name}`);
     console.log(`💰 Valor: ${enhanced_custom_data.value || 'N/A'}`);
     console.log(`🎯 Produto: ${enhanced_custom_data.content_name || 'N/A'}`);
+    console.log(`📈 LTV: ${enhanced_custom_data.predicted_ltv || 'N/A'}`);
 
 
     // ENVIAR PARA FACEBOOK
@@ -154,12 +186,13 @@ app.post("/event", async (req, res) => {
 
     // RESPOSTA
     return res.json({ 
-      ok: true, 
-      event_name,
-      pixel_id: PIXEL_ID,
-      event_id: payload.data[0].event_id,
-      value: enhanced_custom_data.value || null,
-      result 
+        ok: true, 
+        event_name,
+        pixel_id: PIXEL_ID,
+        event_id: payload.data[0].event_id,
+        value: enhanced_custom_data.value || null,
+        predicted_ltv: enhanced_custom_data.predicted_ltv || null,
+        result 
     });
 
 
@@ -175,143 +208,149 @@ app.post("/event", async (req, res) => {
 
 // ENDPOINT ESPECÍFICO PARA PURCHASE (ALTA PERFORMANCE)
 app.post("/purchase", async (req, res) => {
-  try {
-    const { 
-      event_id,
-      user = {},
-      product_value,
-      product_name,
-      product_id,
-      transaction_id = null,
-      event_source_url = ""
-    } = req.body;
+    try {
+        const { 
+            event_id,
+            user = {},
+            product_value,
+            product_name,
+            product_id,
+            transaction_id = null,
+            event_source_url = "",
+            predicted_ltv = null // ✅ NOVO PARÂMETRO
+        } = req.body;
 
 
 
-    // VALIDAÇÃO OBRIGATÓRIA
-    if (!product_value || !product_name || !product_id) {
-      return res.status(400).json({ 
-        error: "Dados obrigatórios: product_value, product_name, product_id" 
-      });
-    }
-
-
-
-    // VALIDAR SE VALUE É NUMÉRICO
-    const numericValue = parseFloat(product_value);
-    if (isNaN(numericValue) || numericValue <= 0) {
-      return res.status(400).json({ 
-        error: "product_value deve ser um número positivo" 
-      });
-    }
-
-
-
-    // USER DATA COM HASH
-    const user_data = {};
-    
-    if (user.email) {
-      user_data.em = sha256(String(user.email).trim().toLowerCase());
-    }
-    if (user.phone) {
-      const cleanPhone = String(user.phone).replace(/\D/g, "");
-      user_data.ph = sha256(cleanPhone);
-    }
-    if (user.name) {
-      user_data.fn = sha256(String(user.name).trim().toLowerCase());
-    }
-    if (user.fbp) user_data.fbp = user.fbp;
-    if (user.fbc) user_data.fbc = user.fbc;
-
-
-
-    // IP E USER AGENT
-    user_data.client_user_agent = req.headers["user-agent"] || "";
-    user_data.client_ip_address = req.headers["x-forwarded-for"]
-      ? req.headers["x-forwarded-for"].split(",")[0].trim()
-      : req.socket.remoteAddress;
-
-
-
-    // CUSTOM DATA OTIMIZADO PARA PURCHASE
-    const custom_data = {
-      content_ids: [product_id],
-      content_name: product_name,
-      content_type: "subscription",
-      value: numericValue,
-      currency: "BRL",
-      num_items: 1
-    };
-
-
-
-    // ADICIONAR ORDER_ID SE TIVER
-    if (transaction_id) {
-      custom_data.order_id = transaction_id;
-    }
-
-
-
-    // PAYLOAD FINAL
-    const payload = {
-      data: [
-        {
-          event_name: "Purchase",
-          event_time: Math.floor(Date.now() / 1000),
-          event_id: event_id || `purchase_${Date.now()}_${Math.random().toString(36).slice(2,9)}`,
-          event_source_url,
-          action_source: "website",
-          user_data,
-          custom_data
+        // VALIDAÇÃO OBRIGATÓRIA
+        if (!product_value || !product_name || !product_id) {
+            return res.status(400).json({ 
+                error: "Dados obrigatórios: product_value, product_name, product_id" 
+            });
         }
-      ]
-    };
 
 
 
-    if (TEST_EVENT_CODE) {
-      payload.test_event_code = TEST_EVENT_CODE;
+        // VALIDAR SE VALUE É NUMÉRICO
+        const numericValue = parseFloat(product_value);
+        if (isNaN(numericValue) || numericValue <= 0) {
+            return res.status(400).json({ 
+                error: "product_value deve ser um número positivo" 
+            });
+        }
+
+
+
+        // USER DATA COM HASH
+        const user_data = {};
+        
+        if (user.email) {
+            user_data.em = sha256(String(user.email).trim().toLowerCase());
+        }
+        if (user.phone) {
+            const cleanPhone = String(user.phone).replace(/\D/g, "");
+            user_data.ph = sha256(cleanPhone);
+        }
+        if (user.name) {
+            user_data.fn = sha256(String(user.name).trim().toLowerCase());
+        }
+        if (user.fbp) user_data.fbp = user.fbp;
+        if (user.fbc) user_data.fbc = user.fbc;
+
+
+
+        // IP E USER AGENT
+        user_data.client_user_agent = req.headers["user-agent"] || "";
+        user_data.client_ip_address = req.headers["x-forwarded-for"]
+            ? req.headers["x-forwarded-for"].split(",")[0].trim()
+            : req.socket.remoteAddress;
+
+
+
+        // ✅ CUSTOM DATA COMPLETO COM PREDICTED_LTV
+        const custom_data = {
+            content_ids: [product_id],
+            content_name: product_name,
+            content_type: "product",
+            content_category: "digital_subscription",
+            value: numericValue,
+            currency: "BRL",
+            num_items: 1,
+            predicted_ltv: predicted_ltv || Math.round(numericValue * 8.5), // ✅ LTV OBRIGATÓRIO
+            delivery_category: "digital_product"
+        };
+
+
+
+        // ADICIONAR ORDER_ID SE TIVER
+        if (transaction_id) {
+            custom_data.order_id = transaction_id;
+        }
+
+
+
+        // PAYLOAD FINAL
+        const payload = {
+            data: [
+                {
+                    event_name: "Purchase",
+                    event_time: Math.floor(Date.now() / 1000),
+                    event_id: event_id || `purchase_${Date.now()}_${Math.random().toString(36).slice(2,9)}`,
+                    event_source_url,
+                    action_source: "website",
+                    user_data,
+                    custom_data
+                }
+            ]
+        };
+
+
+
+        if (TEST_EVENT_CODE) {
+            payload.test_event_code = TEST_EVENT_CODE;
+        }
+
+
+
+        // LOG DETALHADO
+        console.log(`🛒 PURCHASE COM LTV OTIMIZADO:`);
+        console.log(`   📦 Produto: ${product_name}`);
+        console.log(`   💰 Valor: R$ ${numericValue.toFixed(2)}`);
+        console.log(`   🎯 LTV: R$ ${custom_data.predicted_ltv.toFixed(2)}`);
+        console.log(`   🆔 ID: ${product_id}`);
+        console.log(`   👤 Cliente: ${user.name || 'N/A'}`);
+        console.log(`   💳 Transação: ${transaction_id || 'N/A'}`);
+
+
+
+        // ENVIAR PARA FACEBOOK
+        const result = await sendToPixel(PIXEL_ID, ACCESS_TOKEN, payload);
+
+
+
+        // RESPOSTA OTIMIZADA
+        return res.json({ 
+            ok: true, 
+            event: "Purchase", 
+            product_name,
+            value: numericValue,
+            predicted_ltv: custom_data.predicted_ltv,
+            currency: "BRL",
+            pixel_id: PIXEL_ID,
+            event_id: payload.data[0].event_id,
+            timestamp: new Date().toISOString(),
+            result 
+        });
+
+
+
+    } catch (err) {
+        console.error("❌ Erro Purchase CAPI:", err);
+        return res.status(500).json({ 
+            error: "Erro ao processar Purchase", 
+            details: String(err) 
+        });
     }
-
-
-
-    // LOG DETALHADO
-    console.log(`🛒 PURCHASE DETECTADO:`);
-    console.log(`   📦 Produto: ${product_name}`);
-    console.log(`   💰 Valor: R$ ${numericValue.toFixed(2)}`);
-    console.log(`   🆔 ID: ${product_id}`);
-    console.log(`   👤 Cliente: ${user.name || 'N/A'}`);
-    console.log(`   💳 Transação: ${transaction_id || 'N/A'}`);
-
-
-
-    // ENVIAR PARA FACEBOOK
-    const result = await sendToPixel(PIXEL_ID, ACCESS_TOKEN, payload);
-
-
-
-    // RESPOSTA OTIMIZADA
-    return res.json({ 
-      ok: true, 
-      event: "Purchase", 
-      product_name,
-      value: numericValue,
-      currency: "BRL",
-      pixel_id: PIXEL_ID,
-      event_id: payload.data[0].event_id,
-      timestamp: new Date().toISOString(),
-      result 
-    });
-
-
-
-  } catch (err) {
-    console.error("❌ Erro Purchase CAPI:", err);
-    return res.status(500).json({ 
-      error: "Erro ao processar Purchase", 
-      details: String(err) 
-    });
-  }
 });
 
 app.get("/", (req, res) => {
