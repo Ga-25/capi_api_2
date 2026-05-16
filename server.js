@@ -3,45 +3,21 @@ import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
 import crypto from "crypto";
-import rateLimit from "express-rate-limit";
 
 const app = express();
-app.set("trust proxy", 1);
-app.use(cors({
-  origin: [
-    'https://accesstream.com.br',
-    'https://www.accesstream.com.br',
-  ],
-  methods: ["GET", "POST"],
-  credentials: true
-}));// em produção restrinja o origin
-app.use(express.json({
-  limit: "1mb"
-}));
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: {
-    error: "Muitas requisições. Tente novamente depois."
-  }
-});
-
-app.use(limiter);
+app.use(cors()); // em produção restrinja o origin
+app.use(express.json());
 
 // variáveis (defina no Render)
 const PIXEL_ID = process.env.PIXEL_ID;                      // primary
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;              // primary token
 const BACKUP_PIXEL_ID = process.env.BACKUP_PIXEL_ID || "";  // opcional
 const BACKUP_ACCESS_TOKEN = process.env.BACKUP_ACCESS_TOKEN || ""; // opcional
-const API_VERSION = process.env.API_VERSION || "v22.0";
+const API_VERSION = process.env.API_VERSION || "v19.0";
 const TEST_EVENT_CODE = process.env.TEST_EVENT_CODE || null; // opcional
 
 function sha256(value = "") {
-  return crypto
-    .createHash("sha256")
-    .update(String(value).trim().toLowerCase())
-    .digest("hex");
+  return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 async function sendToPixel(pixelId, token, payload) {
@@ -57,30 +33,8 @@ async function sendToPixel(pixelId, token, payload) {
 }
 
 app.post("/event", async (req, res) => {
-
   try {
-
-    const {
-      event_name = "CustomEvent",
-      event_id,
-      event_source_url = "",
-      user = {},
-      custom_data = {}
-    } = req.body;
-
-    const allowedEvents = [
-      "PageView",
-      "Lead",
-      "CompleteRegistration",
-      "AddPaymentInfo",
-      "Purchase"
-    ];
-
-    if (!allowedEvents.includes(event_name)) {
-      return res.status(400).json({
-        error: "Evento não permitido"
-      });
-    }
+    const { event_name = "CustomEvent", event_id, event_source_url = "", user = {}, custom_data = {} } = req.body;
 
     // NÃO envie PageView do servidor por padrão (evita alerta de "PageView não desduplicado")
     if (event_name && event_name.toLowerCase() === "pageview") {
@@ -89,30 +43,9 @@ app.post("/event", async (req, res) => {
 
     // montar user_data com hash (conforme exigência do Meta)
     const user_data = {};
-      if (user.email) {
-        user_data.em = sha256(user.email);
-      }
-
-      if (user.phone) {
-
-        const cleanPhone = String(user.phone).replace(/\D/g, "");
-
-        if (cleanPhone.length >= 12 && cleanPhone.length <= 13) {
-          user_data.ph = sha256(cleanPhone);
-        }
-      }
-
-      if (user.first_name) {
-        user_data.fn = sha256(user.first_name);
-      }
-
-      if (user.last_name) {
-        user_data.ln = sha256(user.last_name);
-      }
-
-      if (user.external_id) {
-        user_data.external_id = sha256(user.external_id);
-      }
+    if (user.email) user_data.em = sha256(String(user.email).trim().toLowerCase());
+    if (user.phone) user_data.ph = sha256(String(user.phone).replace(/\D/g, ""));
+    if (user.name)  user_data.fn = sha256(String(user.name).trim().toLowerCase());
     if (user.fbp) user_data.fbp = user.fbp;
     if (user.fbc) user_data.fbc = user.fbc;
 
