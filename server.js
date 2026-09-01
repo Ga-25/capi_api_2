@@ -13,8 +13,8 @@ app.set('trust proxy', 1);
 // FURION POWER - Enhanced CORS
 app.use(cors({
   origin: [
-    'https://acesstream.com.br',
-    'https://www.acesstream.com.br'
+    'https://accesstream.com.br',
+    'https://www.accesstream.com.br'
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
